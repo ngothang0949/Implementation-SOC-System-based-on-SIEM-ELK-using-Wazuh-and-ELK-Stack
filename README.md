@@ -1,27 +1,45 @@
-<a id="en"></a>
+# SOC System using Wazuh (SIEM/EDR) Integrated with ELK Stack
 
-# SOC Lab: Wazuh (SIEM/EDR) + ELK Stack
-
----
-
-## 1. Overview
-
-This is a small SOC (Security Operations Center) lab. It uses **Wazuh** as the SIEM/EDR platform. It is integrated with the **ELK Stack** (Elasticsearch, Logstash, Kibana).
-
-The lab was built in a 12-week internship (Jan – Apr 2026). It is a learning project, not a production system.
-
-What the system can do:
-
-- Collect logs from endpoints (Ubuntu, Windows) with Wazuh Agent.
-- Collect logs from devices without agent (pfSense) with syslog.
-- Analyze logs with decoders and rules, then create alerts.
-- Store and search alerts in Elasticsearch.
-- Show alerts on Kibana dashboards.
-- Detect SSH brute-force and TCP flood with custom rules.
-
-> **Note:** The detection rules only cover a few attacks (SSH and TCP flood). So please do not think this is a full SOC. It is a base that I want to grow later.
+**[English](#english) | [Tiếng Việt](#tiếng-việt)**
 
 ---
+
+# English
+
+**Internship report – Information Security**
+**Topic:** Research on a SOC system that uses SIEM/EDR (Wazuh) as the platform, integrated with ELK Stack
+
+- **Student:** Ngo Duc Thang (ID: B2203737)
+- **Supervisor:** Dr. Ngo Ba Hung
+- **Internship place:** VNPT Can Tho – Solution Business Center (12/01/2026 – 18/04/2026)
+- **Company mentor:** Huynh Quoc Vinh
+
+## Contents
+
+- [1. Introduction](#1-introduction)
+- [2. Architecture](#2-architecture)
+- [3. Lab network](#3-lab-network)
+- [4. Requirements](#4-requirements)
+- [5. Installation](#5-installation)
+- [6. Agents and pfSense](#6-agents-and-pfsense)
+- [7. Custom detection rules](#7-custom-detection-rules)
+- [8. Testing](#8-testing)
+- [9. Results and future work](#9-results-and-future-work)
+- [10. Notes](#10-notes)
+
+## 1. Introduction
+
+A SOC needs to watch logs from many places. Doing this by hand is not possible. So this project builds a small SOC lab with **Wazuh** as the SIEM/EDR platform and **ELK Stack** (Elasticsearch, Logstash, Kibana) for storing and showing alerts.
+
+What I did in this repo:
+
+- Install and configure Wazuh Manager and ELK Stack on one server.
+- Deploy Wazuh Agent on Ubuntu and Windows 10.
+- Add pfSense as router, firewall and an agentless log source (syslog).
+- Write custom rules and correlation to detect SSH brute-force and TCP flood.
+- Test every rule with real attacks and check the alerts on Kibana.
+
+This is a learning lab. It is not a production system.
 
 ## 2. Architecture
 
@@ -35,6 +53,8 @@ The pipeline has 5 layers:
 | Storage | Elasticsearch | Index and search alerts |
 | Visualization | Kibana | Dashboards and alerting |
 
+Data flow:
+
 ```
 Wazuh Manager
    → /var/ossec/logs/alerts/alerts.json
@@ -46,19 +66,13 @@ Wazuh Manager
       Kibana
 ```
 
-### Why Wazuh + ELK?
+Why use both? Wazuh is strong at security analysis (decoders, rules, MITRE mapping). ELK is strong at storing, searching and visualizing data. ELK alone has no threat detection rules, so it needs Wazuh.
 
-- Wazuh is strong at security analysis. It has rules, decoders and MITRE mapping.
-- ELK is strong at storing, searching and visualizing big data.
-- ELK alone has no threat detection rules. Wazuh alone is less flexible for visualization. Together they fit well.
-
----
-
-## 3. Lab Network
+## 3. Lab network
 
 ![SOC lab network diagram](images/network-diagram.png)
 
-pfSense is the router and the firewall between three LAN branches. It also sends its logs to the Manager, because it cannot run a Wazuh Agent.
+pfSense is the router between three LAN branches. It is also the firewall. It sends its logs to the Manager because it cannot run a Wazuh Agent.
 
 | Device | Role | IP address | Gateway |
 |---|---|---|---|
@@ -70,11 +84,9 @@ pfSense is the router and the firewall between three LAN branches. It also sends
 | Ubuntu | Wazuh Agent | 192.168.20.103/24 | 192.168.20.1 |
 | Windows 10 | Wazuh Agent | 192.168.30.104/24 | 192.168.30.1 |
 
-> **Note:** LAN1 is the "LAN manager". You can open the pfSense web interface from the Manager machine by using its gateway IP `192.168.10.1`. It is very convenient, so I did not need another machine to manage the firewall.
+LAN1 is the "LAN manager". You can open the pfSense web interface from the Manager machine through its gateway IP `192.168.10.1`.
 
----
-
-## 4. Versions
+## 4. Requirements
 
 | Software | Version |
 |---|---|
@@ -83,17 +95,15 @@ pfSense is the router and the firewall between three LAN branches. It also sends
 | Logstash | 7.10.2 (`1:7.10.2-1`) |
 | Wazuh Manager | 4.3.11-1 |
 | Wazuh Agent | 4.3.11 |
-| OS of server | Ubuntu (apt-based) |
+| Server OS | Ubuntu (apt-based) |
 
-> **Note:** Please keep the versions the same as above. The Wazuh agent and manager should match. Different versions may cause errors that are hard to find.
+Attack tools for testing: `hydra` (SSH brute-force) and `hping3` (flood). A Kali Linux machine can be used as the attacker.
 
----
+## 5. Installation
 
-## 5. Installation (on the Manager machine)
+Everything below runs on the Manager machine (`192.168.10.105`).
 
-All of ELK and Wazuh Manager run on one server (`192.168.10.105`).
-
-### 5.1 Elasticsearch
+### 5.1. Elasticsearch
 
 ```bash
 # dependencies
@@ -122,7 +132,7 @@ http.port: 9200
 discovery.type: single-node
 ```
 
-Start it and test:
+Start and test:
 
 ```bash
 sudo systemctl daemon-reload
@@ -132,7 +142,7 @@ sudo systemctl start elasticsearch
 curl http://localhost:9200
 ```
 
-### 5.2 Kibana
+### 5.2. Kibana
 
 ```bash
 sudo apt install -y kibana=7.10.2
@@ -150,7 +160,7 @@ sudo systemctl enable kibana
 sudo systemctl start kibana
 ```
 
-### 5.3 Logstash
+### 5.3. Logstash
 
 ```bash
 sudo apt install -y logstash=1:7.10.2-1
@@ -183,9 +193,7 @@ sudo usermod -a -G wazuh logstash
 sudo systemctl restart logstash
 ```
 
-> **Note:** Do not skip the `usermod` step. Without it Logstash cannot read the alert file, and nothing shows up in Elasticsearch. There is no big error, so it is easy to miss.
-
-Check the pipeline syntax, then start Logstash:
+Check the pipeline syntax and start Logstash:
 
 ```bash
 sudo /usr/share/logstash/bin/logstash --path.settings /etc/logstash -t
@@ -194,7 +202,7 @@ sudo systemctl enable logstash
 sudo systemctl start logstash
 ```
 
-### 5.4 Wazuh Manager
+### 5.4. Wazuh Manager
 
 ```bash
 curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH \
@@ -213,34 +221,30 @@ sudo systemctl start wazuh-manager
 sudo /var/ossec/bin/wazuh-control status
 ```
 
-### 5.5 Check the data flow
+### 5.5. Check the data flow
 
 ```bash
-# 1. Wazuh creates alerts?
+# 1. Does Wazuh create alerts?
 ls -l /var/ossec/logs/alerts/alerts.json
 
-# 2. Index exists in Elasticsearch?
+# 2. Does the index exist in Elasticsearch?
 curl http://localhost:9200/_cat/indices?v
 ```
 
-You should see an index like `wazuh-alerts-YYYY.MM.dd`.
+You must see an index like `wazuh-alerts-YYYY.MM.dd`.
 
 Then open Kibana at `http://<IP_SERVER>:5601` and create an index pattern:
 
 - Index pattern: `wazuh-alerts-*`
 - Time field: `@timestamp`
 
-> **Note:** The first time I saw the alerts appear in Kibana, I was really happy. All the steps before it felt worth it.
+## 6. Agents and pfSense
 
----
-
-## 6. Wazuh Agents
+### 6.1. Wazuh Agent
 
 Install Wazuh Agent 4.3.11 on the Ubuntu and Windows machines. Point them to the Manager `192.168.10.105`.
 
-### Extra log source for Windows (SSH)
-
-Wazuh Agent 4.3.11 does **not** collect OpenSSH logs by default. Add this block at the end of `ossec.conf` on the Windows agent:
+Wazuh Agent 4.3.11 does not collect OpenSSH logs on Windows by default. Add this block at the end of `ossec.conf` on the Windows agent, then restart the agent:
 
 ```xml
 <localfile>
@@ -249,38 +253,30 @@ Wazuh Agent 4.3.11 does **not** collect OpenSSH logs by default. Add this block 
 </localfile>
 ```
 
-> **Note:** Remember to restart the agent after editing `ossec.conf`. If not, the new log source does not work and you will wonder why there is no alert.
+### 6.2. pfSense (agentless)
 
----
-
-## 7. pfSense (agentless logs)
-
-pfSense cannot run a Wazuh Agent. So its logs go to the Manager by syslog.
+pfSense cannot run a Wazuh Agent, so its logs go to the Manager by syslog.
 
 - Install the **syslog-ng** package on pfSense. It collects, sorts, stores and forwards logs. The output is cleaner than the default pfSense log.
-- pfSense sends the logs to the Manager (default syslog port is 514, and syslog-ng forwards to port 5140 in this lab).
-- pfSense also works as the firewall for the LAN branches.
+- Logs are sent to the Manager (default syslog port 514, and syslog-ng forwards to port 5140 in this lab).
+- pfSense also protects the LAN branches as a firewall.
 
-> **Note:** Make sure the Manager is listening for syslog on the port you set in pfSense, and the port is allowed by the firewall. If the port does not match, logs never arrive.
+## 7. Custom detection rules
 
----
-
-## 8. Custom Detection Rules
-
-All rules go into `/var/ossec/etc/rules/local_rules.xml` on the Manager. After editing:
+All rules go into `/var/ossec/etc/rules/local_rules.xml` on the Manager. After editing, restart the Manager:
 
 ```bash
 sudo nano /var/ossec/etc/rules/local_rules.xml
 sudo systemctl restart wazuh-manager
 ```
 
-You can test a rule before using it with `wazuh-logtest`:
+You can test a rule before using it:
 
 ```bash
 sudo /var/ossec/bin/wazuh-logtest
 ```
 
-### 8.1 Ubuntu: SSH monitoring (rule IDs 100100 – 100104)
+### 7.1. Ubuntu: SSH monitoring (100100 – 100104)
 
 | Rule ID | Level | Detects |
 |---|---|---|
@@ -288,13 +284,9 @@ sudo /var/ossec/bin/wazuh-logtest
 | 100101 | 7 | SSH login failed |
 | 100102 | 8 | SSH login with invalid (non-existent) user |
 | 100103 | 12 | SSH brute force (5 failed logins in 60s) |
-| 100104 | 15 | SSH brute force **succeeded** (account compromised) |
+| 100104 | 15 | SSH brute force succeeded (account compromised) |
 
-How the brute-force detection works:
-
-1. 5 failed logins in 60 seconds.
-2. A successful login comes from the same source IP / user.
-3. Alert: possible account compromised.
+The brute-force chain: 5 failed logins in 60s → a successful login from the same source IP → alert for possible compromised account.
 
 ```xml
 <group name="custom_ssh_monitoring,ssh,authentication,">
@@ -355,7 +347,7 @@ How the brute-force detection works:
 </group>
 ```
 
-### 8.2 Windows 10: OpenSSH monitoring (rule IDs 100300 – 100305)
+### 7.2. Windows 10: OpenSSH monitoring (100300 – 100305)
 
 | Rule ID | Level | Detects |
 |---|---|---|
@@ -364,7 +356,7 @@ How the brute-force detection works:
 | 100302 | 7 | SSH wrong username (user does not exist) |
 | 100303 | 12 | SSH brute force (5 failed logins in 60s, same user) |
 | 100304 | 4 | SSH login successful |
-| 100305 | 15 | Suspected brute force **success** (100303 + 100304, same user) |
+| 100305 | 15 | Suspected brute force success (100303 + 100304, same user) |
 
 ```xml
 <group name="windows,openssh,authentication,">
@@ -423,14 +415,14 @@ How the brute-force detection works:
 </group>
 ```
 
-### 8.3 pfSense: flood detection (rule IDs 100500 – 100503)
+### 7.3. pfSense: flood detection (100500 – 100503)
 
 The goal is to detect flood attacks into the management network (LAN1).
 
 | Rule ID | Level | Detects |
 |---|---|---|
 | 100500 | 0 | Base rule for pfSense events |
-| 100501 | 7 | Firewall **block** event |
+| 100501 | 7 | Firewall block event |
 | 100502 | 12 | Many blocks from the same source (10 in 60s) |
 | 100503 | 14 | TCP flood blocked (20 blocks in 30s, same source) |
 
@@ -473,11 +465,7 @@ The goal is to detect flood attacks into the management network (LAN1).
 </group>
 ```
 
-> **Note:** In the demo I block the attacker IP on pfSense directly, because it is fast to test. In a real network you should block by other subnets, or by a specific port, not all TCP. Blocking everything is too strong, and it is only OK for a lab.
-
----
-
-## 9. How to Test
+## 8. Testing
 
 Use the Manager machine (or a Kali machine) as the attacker. After each test, check the alerts on Kibana.
 
@@ -487,26 +475,24 @@ Use the Manager machine (or a Kali machine) as the attacker. After each test, ch
 | Wrong password | `ssh user@<target>` with a wrong password | 100101 / 100301 |
 | Wrong username | `ssh fakeuser@<target>` | 100102 / 100302 |
 | SSH brute force | `hydra` with a wordlist | 100103 / 100303 |
-| Brute force success | Fail 5 times, then login right (6th try) or use `hydra` with the correct password in the list | 100104 / 100305 |
+| Brute force success | Fail 5 times, then login right on the 6th try, or `hydra` with the correct password in the list | 100104 / 100305 |
 | TCP flood | Attacker in LAN3 (`192.168.30.0/24`) uses `hping3` against the Manager | 100501 → 100502 → 100503 |
 
 Example commands:
 
 ```bash
-# SSH brute force (example)
+# SSH brute force
 hydra -l <username> -P passwords.txt ssh://<target_ip>
 
-# TCP flood (example)
+# TCP flood
 sudo hping3 -S --flood -p <port> <target_ip>
 ```
 
-> **Note:** Only attack your own lab. Please do not use these commands on any real system without permission.
+For the flood test, pfSense has a rule to block TCP from the attacker to the LAN manager. The blocked connections create the pfSense logs that trigger rules 100501, 100502 and 100503.
 
-**Tip:** use `wazuh-logtest` first. Paste the raw log line and see which rule fires. It saves a lot of time before you restart the Manager again and again.
+## 9. Results and future work
 
----
-
-## 10. Results
+**Results**
 
 - All custom rules work. They detect valid, invalid and brute-force access.
 - Kibana shows all the alerts from the custom rules.
@@ -514,65 +500,65 @@ sudo hping3 -S --flood -p <port> <target_ip>
 - Dashboards and basic alerts (email / Telegram) are set up on Kibana.
 - The system was checked against MITRE ATT&CK, ISO and NIST.
 
-**Conclusion:** the model works well with the new rules.
+**Not done yet**
 
----
-
-## 11. Limitations and Future Work
-
-Still not done:
-
-- Only basic SSH attacks are covered. HTTP/HTTPS, RDP, web apps, lateral movement and privilege escalation are not monitored well yet.
-- Alerts only notify (email, Telegram). **Wazuh Active Response** is not used yet, so the system cannot block IPs or isolate endpoints automatically.
+- Only basic SSH attacks are covered. HTTP/HTTPS, RDP, web apps, lateral movement and privilege escalation are not monitored well.
+- Alerts only notify (email, Telegram). Wazuh Active Response is not used, so the system cannot block IPs or isolate endpoints automatically.
 - There is still noisy log. Rules and thresholds need tuning for a real environment.
-- ISO/IEC 27001 and NIST 800-53 are not fully satisfied. More rules are needed to map the missing controls.
+- ISO/IEC 27001 and NIST 800-53 are not fully satisfied. More rules are needed for the missing controls.
 
-> **Note:** Noisy logs were the most annoying part for me. Too many false alerts make real ones hard to see. Tuning thresholds is slow work, but it is really important.
+## 10. Notes
 
----
-
-## 12. What I Learned
-
-- How a real SOC is designed, built and run.
-- How to read documentation and apply it, even when it is hard.
-- How to write rules and correlate events.
-- How to debug problems: installation errors, agent connection, log pipeline.
-- How to work in a team and report progress every week.
-
----
-
----
-
-<div align="center">
-
-### [🇻🇳 Chuyển sang Tiếng Việt ⬇](#vi)
-
-</div>
-
-<a id="vi"></a>
-
-# Lab SOC: Wazuh (SIEM/EDR) + ELK Stack
+- Keep the versions in section 4. Wazuh Agent and Manager should be the same version. Different versions can cause errors that are very hard to find.
+- Do not skip the `usermod` step for Logstash. Without it Logstash cannot read `alerts.json` and nothing reaches Elasticsearch. There is no big error, so it is easy to miss.
+- Restart the Wazuh Agent after editing `ossec.conf`. If not, the new log source does not work and you will wonder why there is no alert.
+- Make sure the Manager listens for syslog on the same port you set in pfSense, and the firewall allows it. Wrong port means logs never arrive.
+- In the flood demo I block the attacker IP on pfSense directly because it is fast to test. In a real network, block by other subnets or by a specific port, not all TCP.
+- Use `wazuh-logtest` first. Paste the raw log line and see which rule fires. It saves a lot of time compared with restarting the Manager again and again.
+- Noisy logs were the most annoying part. Too many false alerts hide the real ones. Tuning thresholds is slow, but it is really important.
+- The first time I saw an alert appear in Kibana, I was really happy. All the setup before it felt worth it.
+- IP addresses in this repo are from my lab. Please change them to fit your network.
+- Only attack your own lab. Do not use `hydra` or `hping3` on real systems without permission.
+- This is a small lab. It is not a full SOC.
 
 ---
+
+# Tiếng Việt
+
+**Báo cáo thực tập – Ngành An toàn thông tin**
+**Đề tài:** Nghiên cứu hệ thống SOC sử dụng SIEM/EDR (Wazuh) làm nền tảng, tích hợp ELK Stack
+
+- **Sinh viên:** Ngô Đức Thắng (MSSV: B2203737)
+- **Giảng viên phụ trách:** TS. Ngô Bá Hùng
+- **Nơi thực tập:** Trung tâm Kinh doanh Giải pháp VNPT Cần Thơ (12/01/2026 – 18/04/2026)
+- **Cán bộ hướng dẫn:** Huỳnh Quốc Vinh
+
+## Mục lục
+
+- [1. Giới thiệu](#1-giới-thiệu)
+- [2. Kiến trúc](#2-kiến-trúc)
+- [3. Sơ đồ mạng lab](#3-sơ-đồ-mạng-lab)
+- [4. Yêu cầu](#4-yêu-cầu)
+- [5. Cài đặt](#5-cài-đặt)
+- [6. Agent và pfSense](#6-agent-và-pfsense)
+- [7. Rule phát hiện tự viết](#7-rule-phát-hiện-tự-viết)
+- [8. Kiểm thử](#8-kiểm-thử)
+- [9. Kết quả và hướng phát triển](#9-kết-quả-và-hướng-phát-triển)
+- [10. Lưu ý](#10-lưu-ý)
 
 ## 1. Giới thiệu
 
-Đây là một lab SOC (Security Operations Center) nhỏ. Hệ thống dùng **Wazuh** làm nền tảng SIEM/EDR. Wazuh được tích hợp với **ELK Stack** (Elasticsearch, Logstash, Kibana).
+SOC cần theo dõi log từ rất nhiều nơi. Làm thủ công thì không thể. Vì vậy đề tài xây dựng một lab SOC nhỏ, dùng **Wazuh** làm nền tảng SIEM/EDR và **ELK Stack** (Elasticsearch, Logstash, Kibana) để lưu trữ và hiển thị cảnh báo.
 
-Lab được xây dựng trong 12 tuần thực tập (01 – 04/2026). Đây là đề tài học tập, chưa phải hệ thống chạy thực tế.
+Trong repo này em đã làm:
 
-Hệ thống làm được những việc sau:
+- Cài đặt và cấu hình Wazuh Manager và ELK Stack trên một máy chủ.
+- Triển khai Wazuh Agent trên Ubuntu và Windows 10.
+- Thêm pfSense làm router, tường lửa và nguồn log không cần agent (syslog).
+- Viết rule và correlation để phát hiện SSH brute-force và TCP flood.
+- Test từng rule bằng tấn công thật và kiểm tra alert trên Kibana.
 
-- Thu thập log từ endpoint (Ubuntu, Windows) bằng Wazuh Agent.
-- Thu thập log từ thiết bị không cài được agent (pfSense) qua syslog.
-- Phân tích log bằng decoder và rule, rồi sinh cảnh báo.
-- Lưu trữ và truy vấn cảnh báo trong Elasticsearch.
-- Hiển thị cảnh báo trên dashboard Kibana.
-- Phát hiện SSH brute-force và TCP flood bằng rule tự viết.
-
-> **Lưu ý:** Rule hiện chỉ bao phủ vài loại tấn công (SSH và TCP flood). Vì vậy đừng nghĩ đây là một SOC hoàn chỉnh. Nó chỉ là nền móng để nhóm tiếp tục phát triển sau này.
-
----
+Đây là lab học tập, không phải hệ thống chạy thực tế.
 
 ## 2. Kiến trúc
 
@@ -586,6 +572,8 @@ Pipeline gồm 5 tầng:
 | Lưu trữ | Elasticsearch | Lập chỉ mục và tìm kiếm cảnh báo |
 | Trực quan hóa | Kibana | Dashboard và cảnh báo |
 
+Luồng dữ liệu:
+
 ```
 Wazuh Manager
    → /var/ossec/logs/alerts/alerts.json
@@ -597,19 +585,13 @@ Wazuh Manager
       Kibana
 ```
 
-### Vì sao kết hợp Wazuh + ELK?
-
-- Wazuh mạnh về phân tích an ninh. Có sẵn rule, decoder và ánh xạ MITRE.
-- ELK mạnh về lưu trữ, tìm kiếm và trực quan hóa dữ liệu lớn.
-- ELK đứng một mình thì không có rule phát hiện mối đe dọa. Wazuh đứng một mình thì trực quan hóa kém linh hoạt hơn. Kết hợp lại thì bổ sung cho nhau.
-
----
+Vì sao dùng cả hai? Wazuh mạnh về phân tích an ninh (decoder, rule, ánh xạ MITRE). ELK mạnh về lưu trữ, tìm kiếm và trực quan hóa dữ liệu. ELK đứng một mình thì không có rule phát hiện mối đe dọa, nên cần kết hợp với Wazuh.
 
 ## 3. Sơ đồ mạng lab
 
 ![Sơ đồ mạng lab SOC](images/network-diagram.png)
 
-pfSense vừa là bộ định tuyến, vừa là tường lửa giữa ba nhánh LAN. Ngoài ra pfSense gửi log về Manager, vì nó không cài được Wazuh Agent.
+pfSense là router giữa ba nhánh LAN. Nó cũng là tường lửa. pfSense gửi log về Manager vì không cài được Wazuh Agent.
 
 | Thiết bị | Vai trò | Địa chỉ IP | Gateway |
 |---|---|---|---|
@@ -621,11 +603,9 @@ pfSense vừa là bộ định tuyến, vừa là tường lửa giữa ba nhán
 | Ubuntu | Wazuh Agent | 192.168.20.103/24 | 192.168.20.1 |
 | Windows 10 | Wazuh Agent | 192.168.30.104/24 | 192.168.30.1 |
 
-> **Lưu ý:** LAN1 là "LAN manager". Có thể mở giao diện web của pfSense ngay từ máy Manager, thông qua IP gateway `192.168.10.1`. Cách này rất tiện, không cần thêm máy khác để quản lý tường lửa.
+LAN1 là "LAN manager". Có thể mở giao diện web của pfSense ngay từ máy Manager thông qua IP gateway `192.168.10.1`.
 
----
-
-## 4. Phiên bản
+## 4. Yêu cầu
 
 | Phần mềm | Phiên bản |
 |---|---|
@@ -636,15 +616,13 @@ pfSense vừa là bộ định tuyến, vừa là tường lửa giữa ba nhán
 | Wazuh Agent | 4.3.11 |
 | Hệ điều hành máy chủ | Ubuntu (dùng apt) |
 
-> **Lưu ý:** Hãy giữ đúng các phiên bản như trên. Agent và Manager của Wazuh nên cùng phiên bản. Khác phiên bản có thể gây lỗi rất khó tìm.
+Công cụ tấn công để test: `hydra` (SSH brute-force) và `hping3` (flood). Có thể dùng máy Kali Linux làm máy tấn công.
 
----
+## 5. Cài đặt
 
-## 5. Cài đặt (trên máy Manager)
+Tất cả lệnh bên dưới chạy trên máy Manager (`192.168.10.105`).
 
-Toàn bộ ELK và Wazuh Manager chạy trên một máy chủ (`192.168.10.105`).
-
-### 5.1 Elasticsearch
+### 5.1. Elasticsearch
 
 ```bash
 # cài các gói phụ thuộc
@@ -663,7 +641,7 @@ sudo apt update
 sudo apt install -y elasticsearch=7.10.2
 ```
 
-Sửa file `/etc/elasticsearch/elasticsearch.yml` (chạy single node):
+Sửa file `/etc/elasticsearch/elasticsearch.yml` (single node):
 
 ```yaml
 cluster.name: wazuh-cluster
@@ -683,7 +661,7 @@ sudo systemctl start elasticsearch
 curl http://localhost:9200
 ```
 
-### 5.2 Kibana
+### 5.2. Kibana
 
 ```bash
 sudo apt install -y kibana=7.10.2
@@ -701,7 +679,7 @@ sudo systemctl enable kibana
 sudo systemctl start kibana
 ```
 
-### 5.3 Logstash
+### 5.3. Logstash
 
 ```bash
 sudo apt install -y logstash=1:7.10.2-1
@@ -734,8 +712,6 @@ sudo usermod -a -G wazuh logstash
 sudo systemctl restart logstash
 ```
 
-> **Lưu ý:** Đừng bỏ qua bước `usermod`. Thiếu bước này Logstash không đọc được file alert, và Elasticsearch sẽ không có dữ liệu. Hệ thống không báo lỗi lớn nên rất dễ bỏ sót.
-
 Kiểm tra cú pháp pipeline rồi khởi động Logstash:
 
 ```bash
@@ -745,7 +721,7 @@ sudo systemctl enable logstash
 sudo systemctl start logstash
 ```
 
-### 5.4 Wazuh Manager
+### 5.4. Wazuh Manager
 
 ```bash
 curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH \
@@ -764,7 +740,7 @@ sudo systemctl start wazuh-manager
 sudo /var/ossec/bin/wazuh-control status
 ```
 
-### 5.5 Kiểm tra luồng dữ liệu
+### 5.5. Kiểm tra luồng dữ liệu
 
 ```bash
 # 1. Wazuh có sinh alert không?
@@ -781,17 +757,13 @@ Sau đó mở Kibana tại `http://<IP_SERVER>:5601` và tạo index pattern:
 - Index pattern: `wazuh-alerts-*`
 - Time field: `@timestamp`
 
-> **Lưu ý:** Lần đầu thấy alert hiện lên trên Kibana, mình thật sự rất vui. Mọi bước phía trước đều thấy xứng đáng.
+## 6. Agent và pfSense
 
----
-
-## 6. Wazuh Agent
+### 6.1. Wazuh Agent
 
 Cài Wazuh Agent 4.3.11 trên máy Ubuntu và Windows. Trỏ agent về Manager `192.168.10.105`.
 
-### Thêm log source cho Windows (SSH)
-
-Wazuh Agent 4.3.11 **không** thu log OpenSSH theo mặc định. Thêm đoạn sau vào cuối file `ossec.conf` của agent Windows:
+Wazuh Agent 4.3.11 không thu log OpenSSH trên Windows theo mặc định. Thêm đoạn sau vào cuối file `ossec.conf` của agent Windows, rồi restart agent:
 
 ```xml
 <localfile>
@@ -800,38 +772,30 @@ Wazuh Agent 4.3.11 **không** thu log OpenSSH theo mặc định. Thêm đoạn 
 </localfile>
 ```
 
-> **Lưu ý:** Nhớ restart agent sau khi sửa `ossec.conf`. Nếu quên thì log source mới không có tác dụng, và sẽ rất khó hiểu vì sao không có alert.
+### 6.2. pfSense (không dùng agent)
 
----
+pfSense không cài được Wazuh Agent, nên log được gửi về Manager qua syslog.
 
-## 7. pfSense (log không dùng agent)
+- Cài gói **syslog-ng** trên pfSense. Gói này thu thập, phân loại, lưu trữ và chuyển tiếp log. Log đầu ra dễ đọc hơn log mặc định của pfSense.
+- Log được gửi về Manager (cổng syslog mặc định là 514, và trong lab này syslog-ng chuyển tiếp qua cổng 5140).
+- pfSense cũng bảo vệ các nhánh LAN với vai trò tường lửa.
 
-pfSense không cài được Wazuh Agent. Vì vậy log của nó được gửi về Manager qua syslog.
+## 7. Rule phát hiện tự viết
 
-- Cài gói **syslog-ng** trên pfSense. Gói này thu thập, phân loại, lưu trữ và chuyển tiếp log. Log đầu ra dễ đọc và chuẩn hóa tốt hơn log mặc định.
-- pfSense gửi log về Manager (cổng syslog mặc định là 514, và trong lab này syslog-ng chuyển tiếp qua cổng 5140).
-- pfSense cũng là tường lửa bảo vệ các nhánh LAN.
-
-> **Lưu ý:** Phải chắc chắn Manager đang lắng nghe syslog đúng cổng đã cấu hình trên pfSense, và cổng đó được tường lửa cho phép. Sai cổng thì log sẽ không bao giờ tới nơi.
-
----
-
-## 8. Rule phát hiện tự viết
-
-Tất cả rule được thêm vào `/var/ossec/etc/rules/local_rules.xml` trên Manager. Sau khi sửa:
+Tất cả rule được thêm vào `/var/ossec/etc/rules/local_rules.xml` trên Manager. Sau khi sửa, restart Manager:
 
 ```bash
 sudo nano /var/ossec/etc/rules/local_rules.xml
 sudo systemctl restart wazuh-manager
 ```
 
-Có thể test rule trước bằng `wazuh-logtest`:
+Có thể test rule trước khi dùng:
 
 ```bash
 sudo /var/ossec/bin/wazuh-logtest
 ```
 
-### 8.1 Ubuntu: giám sát SSH (rule ID 100100 – 100104)
+### 7.1. Ubuntu: giám sát SSH (100100 – 100104)
 
 | Rule ID | Level | Phát hiện |
 |---|---|---|
@@ -839,13 +803,9 @@ sudo /var/ossec/bin/wazuh-logtest
 | 100101 | 7 | Đăng nhập SSH thất bại |
 | 100102 | 8 | Đăng nhập SSH bằng user không tồn tại |
 | 100103 | 12 | SSH brute force (5 lần thất bại trong 60s) |
-| 100104 | 15 | SSH brute force **thành công** (tài khoản bị chiếm) |
+| 100104 | 15 | SSH brute force thành công (tài khoản bị chiếm) |
 
-Cách phát hiện brute force:
-
-1. Đăng nhập thất bại 5 lần trong 60 giây.
-2. Có đăng nhập thành công từ cùng IP nguồn / cùng user.
-3. Gửi alert nghi ngờ tài khoản đã bị chiếm.
+Chuỗi phát hiện brute force: 5 lần đăng nhập thất bại trong 60s → có đăng nhập thành công từ cùng IP nguồn → gửi alert nghi ngờ tài khoản bị chiếm.
 
 ```xml
 <group name="custom_ssh_monitoring,ssh,authentication,">
@@ -906,7 +866,7 @@ Cách phát hiện brute force:
 </group>
 ```
 
-### 8.2 Windows 10: giám sát OpenSSH (rule ID 100300 – 100305)
+### 7.2. Windows 10: giám sát OpenSSH (100300 – 100305)
 
 | Rule ID | Level | Phát hiện |
 |---|---|---|
@@ -915,7 +875,7 @@ Cách phát hiện brute force:
 | 100302 | 7 | SSH sai username (user không tồn tại) |
 | 100303 | 12 | SSH brute force (5 lần thất bại trong 60s, cùng user) |
 | 100304 | 4 | Đăng nhập SSH thành công |
-| 100305 | 15 | Nghi ngờ brute force **thành công** (100303 + 100304, cùng user) |
+| 100305 | 15 | Nghi ngờ brute force thành công (100303 + 100304, cùng user) |
 
 ```xml
 <group name="windows,openssh,authentication,">
@@ -974,14 +934,14 @@ Cách phát hiện brute force:
 </group>
 ```
 
-### 8.3 pfSense: phát hiện flood (rule ID 100500 – 100503)
+### 7.3. pfSense: phát hiện flood (100500 – 100503)
 
 Mục tiêu là phát hiện các cuộc tấn công flood vào nhánh mạng quản lý (LAN1).
 
 | Rule ID | Level | Phát hiện |
 |---|---|---|
 | 100500 | 0 | Rule gốc cho event của pfSense |
-| 100501 | 7 | Event tường lửa **chặn** kết nối |
+| 100501 | 7 | Event tường lửa chặn kết nối |
 | 100502 | 12 | Nhiều lần bị chặn từ cùng một nguồn (10 lần trong 60s) |
 | 100503 | 14 | Đã chặn TCP flood (20 lần chặn trong 30s, cùng nguồn) |
 
@@ -1024,11 +984,7 @@ Mục tiêu là phát hiện các cuộc tấn công flood vào nhánh mạng qu
 </group>
 ```
 
-> **Lưu ý:** Khi demo, nhóm chặn thẳng IP máy tấn công trên pfSense cho nhanh. Trong mạng thực tế nên chặn theo nhánh mạng khác, hoặc chỉ định cổng cần bảo vệ, thay vì chặn toàn bộ TCP. Chặn hết như vậy quá mạnh tay, chỉ phù hợp với lab.
-
----
-
-## 9. Cách kiểm thử
+## 8. Kiểm thử
 
 Dùng máy Manager (hoặc máy Kali) làm máy tấn công. Sau mỗi lần test, xem alert trên Kibana.
 
@@ -1038,26 +994,24 @@ Dùng máy Manager (hoặc máy Kali) làm máy tấn công. Sau mỗi lần tes
 | Sai password | `ssh user@<target>` với password sai | 100101 / 100301 |
 | Sai username | `ssh fakeuser@<target>` | 100102 / 100302 |
 | SSH brute force | `hydra` với wordlist | 100103 / 100303 |
-| Brute force thành công | Sai 5 lần rồi đăng nhập đúng (lần thứ 6), hoặc dùng `hydra` với wordlist có password đúng | 100104 / 100305 |
+| Brute force thành công | Sai 5 lần rồi đăng nhập đúng ở lần thứ 6, hoặc `hydra` với wordlist có password đúng | 100104 / 100305 |
 | TCP flood | Máy tấn công ở LAN3 (`192.168.30.0/24`) dùng `hping3` vào máy Manager | 100501 → 100502 → 100503 |
 
 Lệnh ví dụ:
 
 ```bash
-# SSH brute force (ví dụ)
+# SSH brute force
 hydra -l <username> -P passwords.txt ssh://<target_ip>
 
-# TCP flood (ví dụ)
+# TCP flood
 sudo hping3 -S --flood -p <port> <target_ip>
 ```
 
-> **Lưu ý:** Chỉ tấn công trong lab của mình. Đừng dùng các lệnh này lên hệ thống thật khi chưa được cho phép.
+Với test flood, pfSense có một rule chặn TCP từ máy tấn công đến LAN manager. Các kết nối bị chặn tạo ra log pfSense, từ đó kích hoạt rule 100501, 100502 và 100503.
 
-**Mẹo:** nên dùng `wazuh-logtest` trước. Dán dòng log gốc vào và xem rule nào được kích hoạt. Cách này tiết kiệm rất nhiều thời gian, đỡ phải restart Manager nhiều lần.
+## 9. Kết quả và hướng phát triển
 
----
-
-## 10. Kết quả
+**Kết quả**
 
 - Tất cả rule tự viết đều hoạt động. Phát hiện được truy cập hợp lệ, không hợp lệ và brute force.
 - Kibana thấy được toàn bộ alert sinh ra từ các rule này.
@@ -1065,35 +1019,23 @@ sudo hping3 -S --flood -p <port> <target_ip>
 - Đã có dashboard và cảnh báo cơ bản (email / Telegram) trên Kibana.
 - Hệ thống đã được đánh giá theo MITRE ATT&CK, ISO và NIST.
 
-**Kết luận:** mô hình hoạt động bình thường với các rule mới.
+**Chưa làm được**
 
----
-
-## 11. Hạn chế và hướng phát triển
-
-Những phần chưa làm được:
-
-- Mới chỉ tập trung vào tấn công SSH cơ bản. Chưa giám sát tốt HTTP/HTTPS, RDP, ứng dụng web, tấn công chiều ngang và thăng quyền.
-- Cảnh báo mới dừng ở thông báo (email, Telegram). Chưa tích hợp **Active Response** của Wazuh, nên hệ thống chưa tự chặn IP hay cô lập endpoint được.
+- Mới chỉ bao phủ tấn công SSH cơ bản. Chưa giám sát tốt HTTP/HTTPS, RDP, ứng dụng web, tấn công chiều ngang và thăng quyền.
+- Cảnh báo mới dừng ở thông báo (email, Telegram). Chưa dùng Active Response của Wazuh, nên hệ thống chưa tự chặn IP hay cô lập endpoint được.
 - Vẫn còn log nhiễu. Cần tinh chỉnh rule và ngưỡng cảnh báo cho hợp với môi trường thực tế.
-- ISO/IEC 27001 và NIST 800-53 chưa đáp ứng đầy đủ. Cần thêm rule ánh xạ với các control còn thiếu.
+- ISO/IEC 27001 và NIST 800-53 chưa đáp ứng đầy đủ. Cần thêm rule cho các control còn thiếu.
 
-> **Lưu ý:** Log nhiễu là phần làm mình mệt nhất. Quá nhiều cảnh báo sai thì cảnh báo thật rất khó thấy. Chỉnh ngưỡng là việc chậm, nhưng thật sự quan trọng.
+## 10. Lưu ý
 
----
-
-## 12. Bài học rút ra
-
-- Hiểu cách một hệ thống SOC thực tế được thiết kế, xây dựng và vận hành.
-- Biết đọc tài liệu kỹ thuật và áp dụng vào thực tế, dù đôi lúc khá khó.
-- Biết viết rule và tương quan sự kiện (correlation).
-- Biết xử lý lỗi: lỗi cài đặt, lỗi kết nối agent, lỗi pipeline log.
-- Rèn kỹ năng làm việc nhóm và báo cáo tiến độ hằng tuần.
-
----
-
-<div align="center">
-
-### [🇬🇧 Switch to English ⬆](#en)
-
-</div>
+- Giữ đúng các phiên bản ở mục 4. Wazuh Agent và Manager nên cùng phiên bản. Khác phiên bản có thể gây lỗi rất khó tìm.
+- Đừng bỏ qua bước `usermod` cho Logstash. Thiếu bước này Logstash không đọc được `alerts.json` và Elasticsearch sẽ không có dữ liệu. Hệ thống không báo lỗi lớn nên rất dễ bỏ sót.
+- Nhớ restart Wazuh Agent sau khi sửa `ossec.conf`. Nếu quên thì log source mới không có tác dụng, và sẽ rất khó hiểu vì sao không có alert.
+- Phải chắc chắn Manager lắng nghe syslog đúng cổng đã đặt trên pfSense, và tường lửa cho phép cổng đó. Sai cổng thì log sẽ không bao giờ tới nơi.
+- Khi demo flood, em chặn thẳng IP máy tấn công trên pfSense cho nhanh. Trong mạng thực tế nên chặn theo nhánh mạng khác hoặc theo cổng cụ thể, không chặn toàn bộ TCP.
+- Nên dùng `wazuh-logtest` trước. Dán dòng log gốc vào và xem rule nào được kích hoạt. Cách này tiết kiệm nhiều thời gian hơn việc restart Manager liên tục.
+- Log nhiễu là phần làm em mệt nhất. Quá nhiều cảnh báo sai sẽ che mất cảnh báo thật. Chỉnh ngưỡng là việc chậm, nhưng thật sự quan trọng.
+- Lần đầu thấy alert hiện lên trên Kibana, em thật sự rất vui. Mọi bước cài đặt phía trước đều thấy xứng đáng.
+- Các địa chỉ IP trong repo là của lab em. Hãy đổi lại cho đúng với mạng của bạn.
+- Chỉ tấn công trong lab của mình. Không dùng `hydra` hay `hping3` lên hệ thống thật khi chưa được phép.
+- Đây là một lab nhỏ. Nó không phải là một SOC hoàn chỉnh.
