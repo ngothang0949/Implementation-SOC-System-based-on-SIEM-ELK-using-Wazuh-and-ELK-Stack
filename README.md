@@ -4,8 +4,6 @@
 
 ---
 
-# English
-
 **Internship report – Information Security**
 **Topic:** Research on a SOC system that uses SIEM/EDR (Wazuh) as the platform, integrated with ELK Stack
 
@@ -523,7 +521,6 @@ For the flood test, pfSense has a rule to block TCP from the attacker to the LAN
 
 ---
 
-# Tiếng Việt
 
 **Báo cáo thực tập – Ngành An toàn thông tin**
 **Đề tài:** Nghiên cứu hệ thống SOC sử dụng SIEM/EDR (Wazuh) làm nền tảng, tích hợp ELK Stack
@@ -548,7 +545,7 @@ For the flood test, pfSense has a rule to block TCP from the attacker to the LAN
 
 ## 1. Giới thiệu
 
-SOC cần theo dõi log từ rất nhiều nơi. Làm thủ công thì không thể. Vì vậy đề tài xây dựng một lab SOC nhỏ, dùng **Wazuh** làm nền tảng SIEM/EDR và **ELK Stack** (Elasticsearch, Logstash, Kibana) để lưu trữ và hiển thị cảnh báo.
+SOC cần theo dõi log từ rất nhiều nơi. Làm thủ công thì không thể. Vì vậy đề tài xây dựng một lab SOC nhỏ, dùng **Wazuh** làm nền tảng SIEM/EDR và **ELK Stack** (Elasticsearch, Logstash, Kibana) để lưu trữ chỉ mục và hiển thị cảnh báo.
 
 Trong repo này em đã làm:
 
