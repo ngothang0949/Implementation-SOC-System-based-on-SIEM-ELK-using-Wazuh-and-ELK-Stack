@@ -1,12 +1,6 @@
 <a id="en"></a>
 
-<div align="center">
-
 # SOC Lab: Wazuh (SIEM/EDR) + ELK Stack
-
-**English** &nbsp;|&nbsp; [Tiếng Việt](#vi)
-
-</div>
 
 ---
 
@@ -547,26 +541,17 @@ Still not done:
 
 ---
 
-<div align="right">
-
-[⬆ Back to top](#en) &nbsp;|&nbsp; [🇻🇳 Chuyển sang Tiếng Việt](#vi)
-
-</div>
-
-<br><br>
-
 ---
----
-
-<a id="vi"></a>
 
 <div align="center">
 
-# Lab SOC: Wazuh (SIEM/EDR) + ELK Stack
-
-[🇬🇧 English](#en) &nbsp;|&nbsp; **🇻🇳 Tiếng Việt**
+### [🇻🇳 Chuyển sang Tiếng Việt ⬇](#vi)
 
 </div>
+
+<a id="vi"></a>
+
+# Lab SOC: Wazuh (SIEM/EDR) + ELK Stack
 
 ---
 
@@ -1107,8 +1092,8 @@ Những phần chưa làm được:
 
 ---
 
-<div align="right">
+<div align="center">
 
-[⬆ Về đầu trang](#vi) &nbsp;|&nbsp; [🇬🇧 Switch to English](#en)
+### [🇬🇧 Switch to English ⬆](#en)
 
 </div>
