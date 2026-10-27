@@ -4,7 +4,7 @@
 
 # SOC Lab: Wazuh (SIEM/EDR) + ELK Stack
 
-**🇬🇧 English** &nbsp;|&nbsp; [🇻🇳 Tiếng Việt](#vi)
+**English** &nbsp;|&nbsp; [Tiếng Việt](#vi)
 
 </div>
 
